@@ -36,9 +36,9 @@ export class OrdersService {
     const order = await this.orderModel.findById(id);
     if (!order) throw new NotFoundException(`Order #${id} not found`);
 
-    // Buscar si el producto ya existe en la comanda
+    // Buscar si el producto ya existe en la comanda con LA MISMA NOTA
     const existingItem = order.items.find(
-      (i) => i.productId.toString() === item.productId,
+      (i) => i.productId.toString() === item.productId && (i.notes ?? '') === (item.notes ?? ''),
     );
 
     if (existingItem) {
