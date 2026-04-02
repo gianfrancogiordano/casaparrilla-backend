@@ -12,6 +12,24 @@ export class IngredientsService {
     return created.save();
   }
 
+  /** Ajuste manual (+/-) de stock */
+  async adjustStock(id: string, delta: number): Promise<Ingredient> {
+    const ingredient = await this.ingredientModel.findById(id);
+    if (!ingredient) throw new NotFoundException(`Ingredient #${id} not found`);
+
+    ingredient.currentStock += delta;
+    return ingredient.save();
+  }
+
+  /** Obtiene ingredientes con stock inferior al mínimo */
+  async getLowStock(): Promise<Ingredient[]> {
+    return this.ingredientModel
+      .find({
+        $expr: { $lt: ['$currentStock', '$minStock'] },
+      })
+      .exec();
+  }
+
   async findAll(): Promise<Ingredient[]> {
     return this.ingredientModel.find().exec();
   }

@@ -12,6 +12,15 @@ export class ClientsService {
     return created.save();
   }
 
+  /** Acumular o deducir puntos de fidelidad */
+  async addPoints(id: string, points: number): Promise<Client> {
+    const client = await this.clientModel.findById(id);
+    if (!client) throw new NotFoundException(`Client #${id} not found`);
+
+    client.loyaltyPoints = (client.loyaltyPoints || 0) + Math.floor(points);
+    return client.save();
+  }
+
   async findAll(): Promise<Client[]> {
     return this.clientModel.find().exec();
   }

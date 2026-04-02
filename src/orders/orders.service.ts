@@ -1,11 +1,20 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import mongoose, { Model } from 'mongoose';
 import { Order, OrderDocument } from './schemas/order.schema';
+
+import { IngredientsService } from '../ingredients/ingredients.service';
+import { ClientsService } from '../clients/clients.service';
+import { Product, ProductDocument } from '../products/schemas/product.schema';
 
 @Injectable()
 export class OrdersService {
-  constructor(@InjectModel(Order.name) private readonly orderModel: Model<OrderDocument>) {}
+  constructor(
+    @InjectModel(Order.name) private readonly orderModel: Model<OrderDocument>,
+    @InjectModel(Product.name) private readonly productModel: Model<ProductDocument>,
+    private readonly ingredientsService: IngredientsService,
+    private readonly clientsService: ClientsService,
+  ) {}
 
   async create(createDto: any): Promise<Order> {
     const created = new this.orderModel(createDto);
@@ -91,6 +100,44 @@ export class OrdersService {
     order.status = 'Pagado';
     order.paymentInfo = { status: 'Pagado', method: paymentMethod };
 
+    const savedOrder = await order.save();
+
+    // DESCUENTO AUTOMÁTICO DE STOCK
+    try {
+      for (const item of savedOrder.items) {
+        // Buscar el producto para obtener su receta
+        const product = await this.productModel.findById(item.productId).exec();
+        if (product && product.recipe && product.recipe.length > 0) {
+          for (const recipeItem of product.recipe) {
+            // Calcular cuánto descontar: cantidadEnReceta * cantidadVendida
+            const delta = -(recipeItem.quantityRequired * item.quantity);
+            await this.ingredientsService.adjustStock(recipeItem.ingredientId.toString(), delta);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error al descontar stock automáticamente:', error);
+    }
+
+    // ACUMULACIÓN DE PUNTOS VIP
+    try {
+      if (savedOrder.clientId) {
+        const points = Math.floor(savedOrder.totals.total);
+        await this.clientsService.addPoints(savedOrder.clientId.toString(), points);
+      }
+    } catch (error) {
+      console.error('Error al acumular puntos fidelidad:', error);
+    }
+
+    return savedOrder;
+  }
+
+  /** Vincula un cliente a una orden abierta */
+  async linkClientToOrder(orderId: string, clientId: string): Promise<Order> {
+    const order = await this.orderModel.findById(orderId);
+    if (!order) throw new NotFoundException(`Order #${orderId} not found`);
+
+    order.clientId = new mongoose.Types.ObjectId(clientId) as any;
     return order.save();
   }
 

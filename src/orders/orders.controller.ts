@@ -21,9 +21,14 @@ export class OrdersController {
     return this.ordersService.findOpenOrderByTable(tableNumber);
   }
 
-  @Get(':id')
   findOne(@Param('id') id: string) {
     return this.ordersService.findOne(id);
+  }
+
+  /** Vincula un cliente a la orden */
+  @Patch(':id/client')
+  linkClient(@Param('id') id: string, @Body('clientId') clientId: string) {
+    return this.ordersService.linkClientToOrder(id, clientId);
   }
 
   @Patch(':id')

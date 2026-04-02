@@ -10,6 +10,16 @@ export class IngredientsController {
     return this.ingredientsService.create(createDto);
   }
 
+  @Get('low-stock')
+  getLowStock() {
+    return this.ingredientsService.getLowStock();
+  }
+
+  @Post(':id/adjust-stock')
+  adjustStock(@Param('id') id: string, @Body('delta') delta: number) {
+    return this.ingredientsService.adjustStock(id, delta);
+  }
+
   @Get()
   findAll() {
     return this.ingredientsService.findAll();
