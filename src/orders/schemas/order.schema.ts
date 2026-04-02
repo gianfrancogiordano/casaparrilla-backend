@@ -25,6 +25,12 @@ export class OrderItem {
 
   @Prop()
   notes: string;
+
+  @Prop({ default: false })
+  sentToCocina: boolean;
+
+  @Prop({ default: true })
+  requiresKitchen: boolean;
 }
 
 const OrderItemSchema = SchemaFactory.createForClass(OrderItem);

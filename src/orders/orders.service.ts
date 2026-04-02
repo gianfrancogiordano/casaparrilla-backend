@@ -31,7 +31,7 @@ export class OrdersService {
    *  Si el producto ya existe en la comanda, incrementa la cantidad. */
   async addItemToOrder(
     id: string,
-    item: { productId: string; productName: string; quantity: number; unitPrice: number; notes?: string },
+    item: { productId: string; productName: string; quantity: number; unitPrice: number; notes?: string; requiresKitchen?: boolean },
   ): Promise<Order> {
     const order = await this.orderModel.findById(id);
     if (!order) throw new NotFoundException(`Order #${id} not found`);
@@ -45,10 +45,17 @@ export class OrdersService {
       // Incrementar cantidad y recalcular subtotal del item
       existingItem.quantity += item.quantity;
       existingItem.subtotal = existingItem.quantity * existingItem.unitPrice;
+      // Si incrementamos un item ya enviado, lo marcamos como no enviado (nueva ronda)
+      existingItem.sentToCocina = false;
     } else {
       // Agregar como nueva línea
       const subtotal = item.quantity * item.unitPrice;
-      order.items.push({ ...item, subtotal } as any);
+      order.items.push({
+        ...item,
+        subtotal,
+        sentToCocina: false,
+        requiresKitchen: item.requiresKitchen ?? true,
+      } as any);
     }
 
     // Recalcular totales de la orden
@@ -83,6 +90,27 @@ export class OrdersService {
 
     order.status = 'Pagado';
     order.paymentInfo = { status: 'Pagado', method: paymentMethod };
+
+    return order.save();
+  }
+
+  /** Marca los ítems pendientes de cocina como enviados y cambia el status a 'En Cocina' */
+  async sendToKitchen(id: string): Promise<Order> {
+    const order = await this.orderModel.findById(id);
+    if (!order) throw new NotFoundException(`Order #${id} not found`);
+
+    let itemsEnviados = 0;
+    for (const item of order.items) {
+      if ((item as any).requiresKitchen && !(item as any).sentToCocina) {
+        (item as any).sentToCocina = true;
+        itemsEnviados++;
+      }
+    }
+
+    // Si hay ítems de cocina, actualizar status
+    if (itemsEnviados > 0) {
+      order.status = 'En Cocina';
+    }
 
     return order.save();
   }

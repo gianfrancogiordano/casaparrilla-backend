@@ -41,6 +41,9 @@ export class Product {
   @Prop({ default: true })
   available: boolean;
 
+  @Prop({ default: true })
+  requiresKitchen: boolean;
+
   @Prop({ type: [RecipeItemSchema], default: [] })
   recipe: RecipeItem[];
 }

@@ -49,6 +49,12 @@ export class OrdersController {
     return this.ordersService.payOrder(id, body.paymentMethod);
   }
 
+  /** Envía los ítems pendientes a cocina */
+  @Post(':id/send-to-kitchen')
+  sendToKitchen(@Param('id') id: string) {
+    return this.ordersService.sendToKitchen(id);
+  }
+
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.ordersService.remove(id);
