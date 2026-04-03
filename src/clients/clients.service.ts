@@ -33,6 +33,16 @@ export class ClientsService {
     return item;
   }
 
+  async findByPhone(phone: string): Promise<Client | null> {
+    return this.clientModel.findOne({ phone }).exec();
+  }
+
+  async findOrCreateByPhone(phone: string, name: string): Promise<Client> {
+    const existing = await this.findByPhone(phone);
+    if (existing) return existing;
+    return this.create({ name, phone, loyaltyPoints: 0, addresses: [] });
+  }
+
   async update(id: string, updateDto: any): Promise<Client> {
     const existing = await this.clientModel.findByIdAndUpdate(id, updateDto, { new: true }).exec();
     if (!existing) {

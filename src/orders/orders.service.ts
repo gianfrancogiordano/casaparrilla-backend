@@ -7,6 +7,8 @@ import { IngredientsService } from '../ingredients/ingredients.service';
 import { ClientsService } from '../clients/clients.service';
 import { Product, ProductDocument } from '../products/schemas/product.schema';
 
+import { OrdersGateway } from './orders.gateway';
+
 @Injectable()
 export class OrdersService {
   constructor(
@@ -14,15 +16,21 @@ export class OrdersService {
     @InjectModel(Product.name) private readonly productModel: Model<ProductDocument>,
     private readonly ingredientsService: IngredientsService,
     private readonly clientsService: ClientsService,
+    private readonly ordersGateway: OrdersGateway,
   ) {}
 
   async create(createDto: any): Promise<Order> {
     const created = new this.orderModel(createDto);
-    return created.save();
+    const savedOrder = await created.save();
+    
+    // Emitir evento de creación (importante para la vista de Delivery)
+    this.ordersGateway.emitOrderCreated(savedOrder);
+    
+    return savedOrder;
   }
 
   async findAll(): Promise<Order[]> {
-    return this.orderModel.find().sort({ createdAt: -1 }).exec();
+    return this.orderModel.find().populate('clientId').sort({ createdAt: -1 }).exec();
   }
 
   /** Busca la orden abierta de una mesa (status != Cerrado/Pagado) */
@@ -73,7 +81,9 @@ export class OrdersService {
     order.totals.taxes = 0;
     order.totals.total = newSubtotal;
 
-    return order.save();
+    const savedOrder = await order.save();
+    this.ordersGateway.emitOrderUpdated(savedOrder);
+    return savedOrder;
   }
 
   /** Elimina un item de una orden por su posición en el array */
@@ -86,7 +96,9 @@ export class OrdersService {
     order.totals.subtotal = newSubtotal;
     order.totals.total = newSubtotal;
 
-    return order.save();
+    const savedOrder = await order.save();
+    this.ordersGateway.emitOrderUpdated(savedOrder);
+    return savedOrder;
   }
 
   /** Cobra y cierra la orden. Marca como Pagado con el método de pago. */
@@ -138,7 +150,9 @@ export class OrdersService {
     if (!order) throw new NotFoundException(`Order #${orderId} not found`);
 
     order.clientId = new mongoose.Types.ObjectId(clientId) as any;
-    return order.save();
+    const savedOrder = await order.save();
+    this.ordersGateway.emitOrderUpdated(savedOrder);
+    return savedOrder;
   }
 
   /** Marca los ítems pendientes de cocina como enviados y cambia el status a 'En Cocina' */
@@ -154,12 +168,13 @@ export class OrdersService {
       }
     }
 
-    // Si hay ítems de cocina, actualizar status
     if (itemsEnviados > 0) {
       order.status = 'En Cocina';
     }
 
-    return order.save();
+    const savedOrder = await order.save();
+    this.ordersGateway.emitOrderUpdated(savedOrder);
+    return savedOrder;
   }
 
   async findOne(id: string): Promise<Order> {
@@ -175,6 +190,10 @@ export class OrdersService {
     if (!existing) {
       throw new NotFoundException(`Order #${id} not found`);
     }
+    
+    // Emitir evento de actualización
+    this.ordersGateway.emitOrderUpdated(existing);
+    
     return existing;
   }
 

@@ -88,6 +88,15 @@ export class Order {
 
   @Prop({ type: PaymentInfoSchema, default: {} })
   paymentInfo: PaymentInfo;
+
+  @Prop()
+  deliveryAddress?: string;
+
+  @Prop()
+  deliveryNotes?: string;
+
+  @Prop()
+  customerPhone?: string;
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);

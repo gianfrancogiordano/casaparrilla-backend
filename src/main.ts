@@ -5,16 +5,32 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   const port = process.env.PORT ?? 3000;
-  // Soporte para múltiples orígenes (separados por coma en el .env)
-  const originsEnv = process.env.FRONTEND_URL || 'http://localhost:4200';
-  const allowedOrigins = originsEnv.split(',').map(origin => origin.trim());
+  // Soporte para múltiples orígenes, siempre incluimos localhost para desarrollo
+  const originsEnv = process.env.FRONTEND_URL || '';
+  const allowedOrigins = [
+    ...originsEnv.split(',').map(o => o.trim()).filter(o => o),
+    'https://admin.casaparrilla.com',
+    'https://www.casaparrilla.com',
+    'https://casaparrilla.com',
+    'http://localhost:*',
+    'http://127.0.0.1:*',
+  ];
 
   app.enableCors({
     origin: (origin, callback) => {
       // Si no hay origen (ej. Postman o servidores), permitimos
       if (!origin) return callback(null, true);
-      
-      if (allowedOrigins.includes(origin)) {
+
+      // Verificamos si el origen coincide exactamente o con un comodín (ej. localhost:*)
+      const isAllowed = allowedOrigins.some(allowed => {
+        if (allowed.includes('*')) {
+          const prefix = allowed.split('*')[0];
+          return origin.startsWith(prefix);
+        }
+        return allowed === origin;
+      });
+
+      if (isAllowed) {
         callback(null, true);
       } else {
         console.error(`🚫 CORS bloqueado para: ${origin}`);

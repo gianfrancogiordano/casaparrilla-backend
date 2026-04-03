@@ -11,6 +11,7 @@ import { ProductsModule } from './products/products.module';
 import { OrdersModule } from './orders/orders.module';
 import { AuthModule } from './auth/auth.module';
 import { ConfiguracionModule } from './configuracion/configuracion.module';
+import { PublicModule } from './public/public.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { ConfiguracionModule } from './configuracion/configuracion.module';
     OrdersModule,
     AuthModule,
     ConfiguracionModule,
+    PublicModule,
   ],
   controllers: [AppController],
   providers: [AppService],
