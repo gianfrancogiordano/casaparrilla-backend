@@ -8,8 +8,11 @@ export class CreateConfiguracionDto {
   @MaxLength(100)
   nombreRestaurante: string;
 
-  @IsEnum(Moneda, { message: 'La moneda debe ser USD, BS o COP.' })
+  @IsEnum(Moneda, { message: 'La moneda principal debe ser USD, BS o COP.' })
   monedaPrincipal: Moneda;
+
+  @IsEnum(Moneda, { message: 'La moneda por defecto de la tienda debe ser USD, BS o COP.' })
+  monedaDefaultTienda: Moneda;
 
   @IsNumber({}, { message: 'La tasa USD→BS debe ser un número.' })
   @IsPositive({ message: 'La tasa USD→BS debe ser mayor a 0.' })

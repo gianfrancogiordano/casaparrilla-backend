@@ -17,6 +17,9 @@ export class Configuracion {
   @Prop({ required: true, enum: Moneda, default: Moneda.USD })
   monedaPrincipal: Moneda;
 
+  @Prop({ required: true, enum: Moneda, default: Moneda.USD })
+  monedaDefaultTienda: Moneda;
+
   @Prop({ required: true, type: Number, min: 0, default: 1 })
   tasaCambioUsdBs: number; // Cuántos Bs equivale 1 USD
 

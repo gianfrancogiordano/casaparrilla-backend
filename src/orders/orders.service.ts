@@ -23,10 +23,18 @@ export class OrdersService {
     const created = new this.orderModel(createDto);
     const savedOrder = await created.save();
     
+    // Poblar de inmediato para que el socket lleve el nombre del cliente
+    const populatedOrder = await this.orderModel.findById(savedOrder._id)
+      .populate('clientId')
+      .populate('waiterId', 'name')
+      .exec();
+
     // Emitir evento de creación (importante para la vista de Delivery)
-    this.ordersGateway.emitOrderCreated(savedOrder);
+    if (populatedOrder) {
+      this.ordersGateway.emitOrderCreated(populatedOrder);
+    }
     
-    return savedOrder;
+    return populatedOrder || savedOrder;
   }
 
   async findAll(): Promise<Order[]> {
@@ -82,8 +90,18 @@ export class OrdersService {
     order.totals.total = newSubtotal;
 
     const savedOrder = await order.save();
-    this.ordersGateway.emitOrderUpdated(savedOrder);
-    return savedOrder;
+    
+    // Poblar para que el socket lleve info completa
+    const populatedOrder = await this.orderModel.findById(savedOrder._id)
+      .populate('clientId')
+      .populate('waiterId', 'name')
+      .exec();
+
+    if (populatedOrder) {
+      this.ordersGateway.emitOrderUpdated(populatedOrder);
+    }
+    
+    return populatedOrder || savedOrder;
   }
 
   /** Elimina un item de una orden por su posición en el array */
@@ -97,8 +115,17 @@ export class OrdersService {
     order.totals.total = newSubtotal;
 
     const savedOrder = await order.save();
-    this.ordersGateway.emitOrderUpdated(savedOrder);
-    return savedOrder;
+    
+    const populatedOrder = await this.orderModel.findById(savedOrder._id)
+      .populate('clientId')
+      .populate('waiterId', 'name')
+      .exec();
+
+    if (populatedOrder) {
+      this.ordersGateway.emitOrderUpdated(populatedOrder);
+    }
+    
+    return populatedOrder || savedOrder;
   }
 
   /** Cobra y cierra la orden. Marca como Pagado con el método de pago. */
@@ -151,8 +178,17 @@ export class OrdersService {
 
     order.clientId = new mongoose.Types.ObjectId(clientId) as any;
     const savedOrder = await order.save();
-    this.ordersGateway.emitOrderUpdated(savedOrder);
-    return savedOrder;
+    
+    const populatedOrder = await this.orderModel.findById(savedOrder._id)
+      .populate('clientId')
+      .populate('waiterId', 'name')
+      .exec();
+
+    if (populatedOrder) {
+      this.ordersGateway.emitOrderUpdated(populatedOrder);
+    }
+    
+    return populatedOrder || savedOrder;
   }
 
   /** Marca los ítems pendientes de cocina como enviados y cambia el status a 'En Cocina' */
@@ -173,8 +209,17 @@ export class OrdersService {
     }
 
     const savedOrder = await order.save();
-    this.ordersGateway.emitOrderUpdated(savedOrder);
-    return savedOrder;
+    
+    const populatedOrder = await this.orderModel.findById(savedOrder._id)
+      .populate('clientId')
+      .populate('waiterId', 'name')
+      .exec();
+
+    if (populatedOrder) {
+      this.ordersGateway.emitOrderUpdated(populatedOrder);
+    }
+    
+    return populatedOrder || savedOrder;
   }
 
   async findOne(id: string): Promise<Order> {
@@ -186,7 +231,11 @@ export class OrdersService {
   }
 
   async update(id: string, updateDto: any): Promise<Order> {
-    const existing = await this.orderModel.findByIdAndUpdate(id, updateDto, { new: true }).exec();
+    const existing = await this.orderModel.findByIdAndUpdate(id, updateDto, { new: true })
+      .populate('clientId')
+      .populate('waiterId', 'name')
+      .exec();
+
     if (!existing) {
       throw new NotFoundException(`Order #${id} not found`);
     }
