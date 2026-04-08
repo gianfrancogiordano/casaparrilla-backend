@@ -21,6 +21,7 @@ export class OrdersController {
     return this.ordersService.findOpenOrderByTable(tableNumber);
   }
 
+  @Get(':id')
   findOne(@Param('id') id: string) {
     return this.ordersService.findOne(id);
   }
