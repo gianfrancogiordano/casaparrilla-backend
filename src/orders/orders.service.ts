@@ -8,6 +8,7 @@ import { ClientsService } from '../clients/clients.service';
 import { Product, ProductDocument } from '../products/schemas/product.schema';
 
 import { OrdersGateway } from './orders.gateway';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class OrdersService {
@@ -17,6 +18,7 @@ export class OrdersService {
     private readonly ingredientsService: IngredientsService,
     private readonly clientsService: ClientsService,
     private readonly ordersGateway: OrdersGateway,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(createDto: any): Promise<Order> {
@@ -38,7 +40,11 @@ export class OrdersService {
   }
 
   async findAll(): Promise<Order[]> {
-    return this.orderModel.find().populate('clientId').sort({ createdAt: -1 }).exec();
+    return this.orderModel.find()
+      .populate('clientId')
+      .populate('waiterId', 'name')
+      .sort({ createdAt: -1 })
+      .exec();
   }
 
   /** Busca la orden abierta de una mesa (status != Cerrado/Pagado) */
@@ -239,10 +245,30 @@ export class OrdersService {
     if (!existing) {
       throw new NotFoundException(`Order #${id} not found`);
     }
-    
-    // Emitir evento de actualización
+
+    // ── Push FCM al cliente si cambió el status de una orden Delivery ──────
+    const newStatus = updateDto.status;
+    const fcmToken = (existing as any).fcmToken;
+    if (newStatus && fcmToken && (existing as any).orderType === 'Delivery') {
+      const pushMessages: Record<string, { title: string; body: string }> = {
+        'En Cocina':  { title: '🍖 Preparando tu pedido', body: 'Ya estamos en la parrilla, ¡pronto llega!' },
+        'En Camino':  { title: '🛵 ¡Tu pedido va en camino!', body: 'El repartidor está yendo hacia ti.' },
+        'Entregado':  { title: '🎉 ¡Pedido entregado!', body: '¡Disfruta tu parrilla! Gracias por elegirnos.' },
+        'Pagado':     { title: '🎉 ¡Pedido entregado!', body: '¡Disfruta tu parrilla! Gracias por elegirnos.' },
+        'Cancelado':  { title: '❌ Pedido cancelado', body: 'Tu pedido fue cancelado. Contáctanos para más info.' },
+      };
+      const msg = pushMessages[newStatus];
+      if (msg) {
+        this.notificationsService.sendToDevice(fcmToken, msg.title, msg.body, {
+          orderId: id,
+          status: newStatus,
+        });
+      }
+    }
+
+    // Emitir evento de actualización (socket)
     this.ordersGateway.emitOrderUpdated(existing);
-    
+
     return existing;
   }
 

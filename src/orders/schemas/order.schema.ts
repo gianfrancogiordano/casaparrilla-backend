@@ -97,6 +97,9 @@ export class Order {
 
   @Prop()
   customerPhone?: string;
+
+  @Prop()
+  fcmToken?: string;  // Token FCM del dispositivo del cliente (Tienda) — para push de status
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);

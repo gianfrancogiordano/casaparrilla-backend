@@ -5,6 +5,7 @@ import { OrdersModule } from '../orders/orders.module';
 import { ClientsModule } from '../clients/clients.module';
 import { ConfiguracionModule } from '../configuracion/configuracion.module';
 import { UsersModule } from '../users/users.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { UsersModule } from '../users/users.module';
     ClientsModule,
     ConfiguracionModule,
     UsersModule,
+    NotificationsModule,
   ],
   controllers: [PublicController],
 })

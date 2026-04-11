@@ -12,6 +12,13 @@ import { OrdersModule } from './orders/orders.module';
 import { AuthModule } from './auth/auth.module';
 import { ConfiguracionModule } from './configuracion/configuracion.module';
 import { PublicModule } from './public/public.module';
+import { ExpensesModule } from './expenses/expenses.module';
+import { CashRegisterModule } from './cash-register/cash-register.module';
+import { ReportsModule } from './reports/reports.module';
+import { PurchasesModule } from './purchases/purchases.module';
+import { PayrollModule } from './payroll/payroll.module';
+import { FixedExpensesModule } from './fixed-expenses/fixed-expenses.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -34,6 +41,13 @@ import { PublicModule } from './public/public.module';
     AuthModule,
     ConfiguracionModule,
     PublicModule,
+    ExpensesModule,
+    CashRegisterModule,
+    ReportsModule,
+    PurchasesModule,
+    PayrollModule,
+    FixedExpensesModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -7,6 +7,7 @@ import { Order, OrderSchema } from './schemas/order.schema';
 import { IngredientsModule } from '../ingredients/ingredients.module';
 import { ClientsModule } from '../clients/clients.module';
 import { Product, ProductSchema } from '../products/schemas/product.schema';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { Product, ProductSchema } from '../products/schemas/product.schema';
     ]),
     IngredientsModule,
     ClientsModule,
+    NotificationsModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService, OrdersGateway], // Register the gateway

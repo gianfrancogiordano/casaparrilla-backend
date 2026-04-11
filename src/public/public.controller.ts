@@ -4,6 +4,7 @@ import { OrdersService } from '../orders/orders.service';
 import { ClientsService } from '../clients/clients.service';
 import { ConfiguracionService } from '../configuracion/configuracion.service';
 import { UsersService } from '../users/users.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Controller('public')
 export class PublicController {
@@ -13,6 +14,7 @@ export class PublicController {
     private readonly clientsService: ClientsService,
     private readonly configuracionService: ConfiguracionService,
     private readonly usersService: UsersService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   @Get('configuracion')
@@ -63,13 +65,14 @@ export class PublicController {
     
     const newOrder = {
       orderNumber,
-      status: 'Recibido', // Estado inicial para delivery
+      status: 'Recibido',
       orderType: 'Delivery',
       waiterId: (deliveryUser as any)._id,
       clientId: body.clientId,
       customerPhone: body.customerPhone,
       deliveryAddress: body.deliveryAddress,
       deliveryNotes: body.deliveryNotes,
+      fcmToken: body.fcmToken ?? null,   // 🆕 Guardamos el token del cliente
       items: body.items.map((item: any) => ({
         ...item,
         sentToCocina: false,
@@ -86,7 +89,19 @@ export class PublicController {
       },
     };
 
-    return this.ordersService.create(newOrder);
+    const savedOrder = await this.ordersService.create(newOrder);
+
+    // 🆕 Notificar al admin sobre el nuevo delivery
+    const clientName = body.clientName || body.customerPhone || 'Cliente';
+    const address = body.deliveryAddress || 'Dirección no especificada';
+    this.notificationsService.sendToTopic(
+      'admin-deliveries',
+      '🛵 Nuevo Delivery',
+      `${clientName} — ${address}`,
+      { orderId: (savedOrder as any)._id?.toString() ?? '', orderType: 'Delivery' },
+    );
+
+    return savedOrder;
   }
 
   @Get('orders/:id')
