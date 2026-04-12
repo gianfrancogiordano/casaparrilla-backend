@@ -10,6 +10,9 @@ import { Product, ProductDocument } from '../products/schemas/product.schema';
 import { OrdersGateway } from './orders.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
 
+const AGENT_URL = process.env.AGENT_URL ?? 'http://localhost:3008';
+
+
 @Injectable()
 export class OrdersService {
   constructor(
@@ -236,6 +239,10 @@ export class OrdersService {
     return item;
   }
 
+  async findByOrderNumber(orderNumber: string): Promise<Order | null> {
+    return this.orderModel.findOne({ orderNumber }).exec();
+  }
+
   async update(id: string, updateDto: any): Promise<Order> {
     const existing = await this.orderModel.findByIdAndUpdate(id, updateDto, { new: true })
       .populate('clientId')
@@ -263,6 +270,38 @@ export class OrdersService {
           orderId: id,
           status: newStatus,
         });
+      }
+    }
+
+    // ── WhatsApp proactivo via Valentina (solo Delivery con teléfono) ─────────
+    const customerPhone = (existing as any).customerPhone;
+    if (newStatus && customerPhone && (existing as any).orderType === 'Delivery') {
+      const waMessages: Record<string, string> = {
+        'En Camino': `🚕 ¡Tu pedido *${(existing as any).orderNumber}* va en camino! El repartidor ya salió. Aprovecha de preparar el pago 😊`,
+        'Entregado': `🎉 ¡Tu pedido *${(existing as any).orderNumber}* fue entregado! Esperamos que lo disfrutes mucho 🔥\n\n¿Cómo was tu experiencia? Respóndenos con un número del 1 al 5 ⭐`,
+      };
+      const waMsg = waMessages[newStatus];
+      if (waMsg) {
+        // Call Valentina's WhatsApp sending endpoint (non-blocking)
+        fetch(`${AGENT_URL}/v1/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ number: customerPhone, message: waMsg }),
+        }).catch(e => console.warn('⚠️ WhatsApp notification failed:', e.message));
+      }
+
+      // 📣 Encuesta de satisfacción — 30 min después de Entregado
+      if (newStatus === 'Entregado') {
+        setTimeout(() => {
+          fetch(`${AGENT_URL}/v1/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              number: customerPhone,
+              message: `⭐ ¿Cómo calificarías tu experiencia con Casa Parrilla?\n\nResponde con un número:\n5 ⭐ Excelente\n4 👍 Muy bueno\n3 😐 Regular\n2 👎 Malo\n1 😠 Pésimo`,
+            }),
+          }).catch(e => console.warn('⚠️ Survey notification failed:', e.message));
+        }, 30 * 60 * 1000); // 30 minutes
       }
     }
 

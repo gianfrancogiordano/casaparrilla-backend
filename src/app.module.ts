@@ -19,6 +19,8 @@ import { PurchasesModule } from './purchases/purchases.module';
 import { PayrollModule } from './payroll/payroll.module';
 import { FixedExpensesModule } from './fixed-expenses/fixed-expenses.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { ChatModule } from './chat/chat.module';
+import { AgentModule } from './agent/agent.module';
 
 @Module({
   imports: [
@@ -27,9 +29,13 @@ import { NotificationsModule } from './notifications/notifications.module';
     }),
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        uri: configService.get<string>('MONGODB_URI'),
-      }),
+      useFactory: async (configService: ConfigService) => {
+        const isProd = process.env.NODE_ENV === 'production';
+        return {
+          uri: configService.get<string>('MONGODB_URI'),
+          dbName: isProd ? 'casaparrilla' : 'casaparrilla_test',
+        };
+      },
       inject: [ConfigService],
     }),
     RolesModule,
@@ -48,6 +54,8 @@ import { NotificationsModule } from './notifications/notifications.module';
     PayrollModule,
     FixedExpensesModule,
     NotificationsModule,
+    ChatModule,
+    AgentModule,
   ],
   controllers: [AppController],
   providers: [AppService],

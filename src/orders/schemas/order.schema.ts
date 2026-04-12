@@ -100,6 +100,13 @@ export class Order {
 
   @Prop()
   fcmToken?: string;  // Token FCM del dispositivo del cliente (Tienda) — para push de status
+
+  // ─── Satisfacción del cliente ─────────────────────────────────────────────
+  @Prop({ type: Number, min: 1, max: 5 })
+  rating?: number;        // Calificación 1-5 enviada por WhatsApp post-entrega
+
+  @Prop({ trim: true })
+  ratingComment?: string; // Comentario adicional opcional
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);

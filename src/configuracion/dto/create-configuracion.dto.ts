@@ -1,5 +1,22 @@
-import { IsString, IsNotEmpty, IsEnum, IsNumber, IsPositive, IsOptional, IsUrl, Min, MinLength, MaxLength } from 'class-validator';
+import {
+  IsString, IsNotEmpty, IsEnum, IsNumber, IsPositive, IsOptional,
+  IsUrl, IsBoolean, IsArray, ValidateNested, Matches, Min, MinLength, MaxLength,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import { Moneda } from '../schemas/configuracion.schema';
+
+export class HorarioDiaDto {
+  @IsBoolean()
+  activo: boolean;
+
+  @IsString()
+  @Matches(/^\d{2}:\d{2}$/, { message: 'La hora debe tener formato HH:mm (ej: 12:00)' })
+  apertura: string;
+
+  @IsString()
+  @Matches(/^\d{2}:\d{2}$/, { message: 'La hora debe tener formato HH:mm (ej: 22:00)' })
+  cierre: string;
+}
 
 export class CreateConfiguracionDto {
   @IsString()
@@ -27,6 +44,16 @@ export class CreateConfiguracionDto {
   cantidadMesas: number;
 
   @IsOptional()
+  @IsBoolean()
+  activo?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => HorarioDiaDto)
+  horario?: HorarioDiaDto[];
+
+  @IsOptional()
   @IsString()
   direccion?: string;
 
@@ -37,4 +64,24 @@ export class CreateConfiguracionDto {
   @IsOptional()
   @IsUrl({}, { message: 'El logo debe ser una URL válida.' })
   logoUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  pagoEfectivo?: string;
+
+  @IsOptional()
+  @IsString()
+  pagoPagoMovil?: string;
+
+  @IsOptional()
+  @IsString()
+  pagoBinance?: string;
+
+  @IsOptional()
+  @IsString()
+  pagoBancolombia?: string;
+
+  @IsOptional()
+  @IsString()
+  pagoZelle?: string;
 }

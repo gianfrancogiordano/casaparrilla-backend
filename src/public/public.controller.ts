@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, NotFoundException, ForbiddenException, Patch } from '@nestjs/common';
 import { ProductsService } from '../products/products.service';
 import { OrdersService } from '../orders/orders.service';
 import { ClientsService } from '../clients/clients.service';
@@ -20,6 +20,12 @@ export class PublicController {
   @Get('configuracion')
   async getConfig() {
     return this.configuracionService.get();
+  }
+
+  @Get('status')
+  async getStatus() {
+    const config = await this.configuracionService.get() as any;
+    return this.configuracionService.isOpen(config.horario ?? [], config.activo ?? true);
   }
 
   @Get('products')
@@ -55,6 +61,16 @@ export class PublicController {
 
   @Post('orders')
   async createOrder(@Body() body: any) {
+    // Verificar si el restaurante está abierto
+    const config = await this.configuracionService.get() as any;
+    const { isOpen, nextOpening } = this.configuracionService.isOpen(config.horario ?? [], config.activo ?? true);
+    if (!isOpen) {
+      const msg = nextOpening
+        ? `El restaurante está cerrado. Abrimos ${nextOpening}.`
+        : 'El restaurante está cerrado por hoy.';
+      throw new ForbiddenException(msg);
+    }
+
     // Buscar el usuario "Delivery" para asignar como mesero
     const deliveryUser = await this.usersService.findByName('Delivery');
     if (!deliveryUser) {
@@ -72,16 +88,21 @@ export class PublicController {
       customerPhone: body.customerPhone,
       deliveryAddress: body.deliveryAddress,
       deliveryNotes: body.deliveryNotes,
-      fcmToken: body.fcmToken ?? null,   // 🆕 Guardamos el token del cliente
+      fcmToken: body.fcmToken ?? null,
       items: body.items.map((item: any) => ({
-        ...item,
+        productId: item.productId || new (require('mongoose').Types.ObjectId)(),
+        productName: item.productName || item.name,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice ?? item.price,
+        subtotal: item.subtotal ?? (item.quantity * (item.unitPrice ?? item.price)),
+        notes: item.notes ?? '',
         sentToCocina: false,
         requiresKitchen: item.requiresKitchen ?? true,
       })),
       totals: {
-        subtotal: body.items.reduce((acc: number, val: any) => acc + val.subtotal, 0),
+        subtotal: body.items.reduce((acc: number, val: any) => acc + (val.subtotal ?? val.quantity * (val.unitPrice ?? val.price)), 0),
         taxes: 0,
-        total: body.items.reduce((acc: number, val: any) => acc + val.subtotal, 0),
+        total: body.items.reduce((acc: number, val: any) => acc + (val.subtotal ?? val.quantity * (val.unitPrice ?? val.price)), 0),
       },
       paymentInfo: {
         status: 'Pendiente',
@@ -104,9 +125,26 @@ export class PublicController {
     return savedOrder;
   }
 
+  @Get('orders/by-phone/:phone')
+  async getOrderByPhone(@Param('phone') phone: string) {
+    const orders = await this.ordersService.findAll();
+    const customerOrders = orders
+      .filter((o: any) => o.customerPhone === phone && o.orderType === 'Delivery')
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    if (!customerOrders.length) throw new NotFoundException('No se encontraron pedidos para este número');
+    return customerOrders[0];
+  }
+
   @Get('orders/:id')
   async getOrderStatus(@Param('id') id: string) {
-    const order = await this.ordersService.findOne(id);
+    // Support lookup by orderNumber (DEL-XXXXX) or by MongoDB _id
+    let order;
+    if (id.startsWith('DEL-')) {
+      order = await this.ordersService.findByOrderNumber(id);
+    } else {
+      order = await this.ordersService.findOne(id);
+    }
     if (!order) throw new NotFoundException('Pedido no encontrado');
     
     // Simplificar el estado para el cliente mayor
@@ -150,5 +188,49 @@ export class PublicController {
       items: order.items,
       total: order.totals.total,
     };
+  }
+
+  @Patch('orders/:id/cancel')
+  async cancelOrderPublic(@Param('id') id: string, @Body() body: { reason?: string }) {
+    return this.ordersService.update(id, { status: 'Cancelado' });
+  }
+
+  @Post('orders/rate')
+  async rateOrder(@Body() body: { phone: string; rating: number; comment?: string }) {
+    const { phone, rating, comment } = body;
+
+    if (!phone || !rating || rating < 1 || rating > 5) {
+      throw new NotFoundException('Datos de calificación inválidos. Se requiere phone y rating (1-5).');
+    }
+
+    // Find the most recent delivered order for this phone
+    const allOrders = await this.ordersService.findAll();
+    const deliveredOrder = allOrders
+      .filter((o: any) =>
+        o.customerPhone === phone &&
+        o.orderType === 'Delivery' &&
+        ['Entregado', 'Pagado'].includes(o.status) &&
+        !(o as any).rating // has not been rated yet
+      )
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+
+    if (!deliveredOrder) {
+      // If all recent orders are already rated, rate the most recent one anyway
+      const anyDelivered = allOrders
+        .filter((o: any) => o.customerPhone === phone && o.orderType === 'Delivery' && ['Entregado', 'Pagado'].includes(o.status))
+        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+
+      if (!anyDelivered) throw new NotFoundException('No se encontró un pedido entregado para calificar.');
+
+      return this.ordersService.update((anyDelivered as any)._id.toString(), {
+        rating: Math.round(rating),
+        ratingComment: comment ?? '',
+      });
+    }
+
+    return this.ordersService.update((deliveredOrder as any)._id.toString(), {
+      rating: Math.round(rating),
+      ratingComment: comment ?? '',
+    });
   }
 }
