@@ -137,7 +137,10 @@ export class OrdersService {
     return populatedOrder || savedOrder;
   }
 
-  /** Cobra y cierra la orden. Marca como Pagado con el método de pago. */
+  /** Cobra la orden.
+   *  - Delivery: solo actualiza paymentInfo (el status sigue el flujo de entrega).
+   *  - Presencial (Meseros): cierra el pedido con status = 'Pagado'.
+   */
   async payOrder(
     id: string,
     paymentMethod: 'Efectivo' | 'Pago Movil' | 'Binance' | 'Bancolombia' | 'Zelle',
@@ -145,7 +148,11 @@ export class OrdersService {
     const order = await this.orderModel.findById(id);
     if (!order) throw new NotFoundException(`Order #${id} not found`);
 
-    order.status = 'Pagado';
+    // Solo cerrar el status para pedidos presenciales
+    if ((order as any).orderType !== 'Delivery') {
+      order.status = 'Pagado';
+    }
+
     order.paymentInfo = { status: 'Pagado', method: paymentMethod };
 
     const savedOrder = await order.save();
@@ -153,11 +160,9 @@ export class OrdersService {
     // DESCUENTO AUTOMÁTICO DE STOCK
     try {
       for (const item of savedOrder.items) {
-        // Buscar el producto para obtener su receta
         const product = await this.productModel.findById(item.productId).exec();
         if (product && product.recipe && product.recipe.length > 0) {
           for (const recipeItem of product.recipe) {
-            // Calcular cuánto descontar: cantidadEnReceta * cantidadVendida
             const delta = -(recipeItem.quantityRequired * item.quantity);
             await this.ingredientsService.adjustStock(recipeItem.ingredientId.toString(), delta);
           }
@@ -177,8 +182,19 @@ export class OrdersService {
       console.error('Error al acumular puntos fidelidad:', error);
     }
 
-    return savedOrder;
+    // Emitir socket para que el frontend actualice la card con el nuevo paymentInfo
+    const populatedOrder = await this.orderModel.findById(savedOrder._id)
+      .populate('clientId')
+      .populate('waiterId', 'name')
+      .exec();
+
+    if (populatedOrder) {
+      this.ordersGateway.emitOrderUpdated(populatedOrder);
+    }
+
+    return populatedOrder || savedOrder;
   }
+
 
   /** Vincula un cliente a una orden abierta */
   async linkClientToOrder(orderId: string, clientId: string): Promise<Order> {
@@ -273,16 +289,20 @@ export class OrdersService {
       }
     }
 
-    // ── WhatsApp proactivo via Valentina (solo Delivery con teléfono) ─────────
+    // ── WhatsApp proactivo via Valentina ─────────────────────────────────────
+    // Solo si el pedido fue creado por el agente de WhatsApp (Valentina)
     const customerPhone = (existing as any).customerPhone;
-    if (newStatus && customerPhone && (existing as any).orderType === 'Delivery') {
+    const isWhatsappOrder = (existing as any).source === 'whatsapp';
+
+    if (newStatus && customerPhone && isWhatsappOrder && (existing as any).orderType === 'Delivery') {
       const waMessages: Record<string, string> = {
-        'En Camino': `🚕 ¡Tu pedido *${(existing as any).orderNumber}* va en camino! El repartidor ya salió. Aprovecha de preparar el pago 😊`,
+        'En Cocina': `🍖 ¡Hola! Tu pedido *${(existing as any).orderNumber}* ya está en la parrilla. En breve estará listo 🔥`,
+        'Lista':     `✅ ¡Tu pedido *${(existing as any).orderNumber}* está listo! El repartidor lo recogerá en cualquier momento 🛵`,
         'Entregado': `🎉 ¡Tu pedido *${(existing as any).orderNumber}* fue entregado! Esperamos que lo disfrutes mucho 🔥\n\n¿Cómo was tu experiencia? Respóndenos con un número del 1 al 5 ⭐`,
+        'Cancelado': `❌ Tu pedido *${(existing as any).orderNumber}* fue cancelado. Contáctanos para más información.`,
       };
       const waMsg = waMessages[newStatus];
       if (waMsg) {
-        // Call Valentina's WhatsApp sending endpoint (non-blocking)
         fetch(`${AGENT_URL}/v1/messages`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -290,7 +310,7 @@ export class OrdersService {
         }).catch(e => console.warn('⚠️ WhatsApp notification failed:', e.message));
       }
 
-      // 📣 Encuesta de satisfacción — 30 min después de Entregado
+      // Encuesta de satisfacción — 30 min después de Entregado
       if (newStatus === 'Entregado') {
         setTimeout(() => {
           fetch(`${AGENT_URL}/v1/messages`, {
@@ -301,9 +321,10 @@ export class OrdersService {
               message: `⭐ ¿Cómo calificarías tu experiencia con Casa Parrilla?\n\nResponde con un número:\n5 ⭐ Excelente\n4 👍 Muy bueno\n3 😐 Regular\n2 👎 Malo\n1 😠 Pésimo`,
             }),
           }).catch(e => console.warn('⚠️ Survey notification failed:', e.message));
-        }, 30 * 60 * 1000); // 30 minutes
+        }, 30 * 60 * 1000);
       }
     }
+
 
     // Emitir evento de actualización (socket)
     this.ordersGateway.emitOrderUpdated(existing);

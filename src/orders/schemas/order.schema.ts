@@ -107,6 +107,10 @@ export class Order {
 
   @Prop({ trim: true })
   ratingComment?: string; // Comentario adicional opcional
+
+  // ─── Origen del pedido ────────────────────────────────────────────────────
+  @Prop({ enum: ['whatsapp', 'tienda', 'admin'], default: 'admin' })
+  source: 'whatsapp' | 'tienda' | 'admin';
 }
 
 export const OrderSchema = SchemaFactory.createForClass(Order);
