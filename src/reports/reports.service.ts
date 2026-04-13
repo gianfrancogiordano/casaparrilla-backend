@@ -22,14 +22,36 @@ export class ReportsService {
   ) {}
 
   /**
-   * Estado de Resultados (P&L) — Integrado con 4 fuentes de egreso
+   * Estado de Resultados (P&L) — Arquitectura contable correcta de 4 niveles:
+   *   Ingresos
+   *   − COGS (Costo de Ventas = Compras reales a proveedores del período)
+   *   ════════════════════
+   *   = Utilidad Bruta
+   *   − Gastos Operativos (Variables + Fijos prorrateados + Nómina pagada)
+   *   ════════════════════
+   *   = Utilidad Neta (EBIT)
+   *
+   *   KPI Analítico: Food Cost Teórico % (basado en recetas — no resta utilidad)
    */
   async getPnl(from?: string, to?: string) {
     const dateFilter = this.buildDateFilter(from, to);
 
+    // ── Calcular factor de prorrateo de gastos fijos ──────────────────────────
+    // Los gastos fijos están registrados como valores MENSUALES.
+    // Si el usuario filtra por N días, se aplica la proporción N/30.
+    const diasPeriodo = (from && to)
+      ? Math.ceil((new Date(to).getTime() - new Date(from).getTime()) / 86400000) + 1
+      : 30;
+    const factorProrrateo = Math.min(diasPeriodo / 30, 1);
+
     // ── 1. INGRESOS ─────────────────────────────────────────────────────────
+    // CORRECCIÓN: captura tanto pedidos presenciales (status='Pagado')
+    // como pedidos de Delivery (paymentInfo.status='Pagado', status='Entregado')
     const ordenes = await this.orderModel.find({
-      status: 'Pagado',
+      $or: [
+        { status: 'Pagado' },
+        { 'paymentInfo.status': 'Pagado' },
+      ],
       ...(dateFilter ? { createdAt: dateFilter } : {}),
     }).exec();
 
@@ -37,14 +59,26 @@ export class ReportsService {
     const cantidadOrdenes = ordenes.length;
     const ticketPromedio = cantidadOrdenes > 0 ? ingresos / cantidadOrdenes : 0;
 
-    // ── 2. COSTO DE VENTA (Food Cost teórico — basado en recetas) ────────────
-    const costoVenta = await this.calculateFoodCostForOrders(ordenes);
+    // ── 2. COGS — Costo de Ventas REAL (Compras a proveedores del período) ───
+    // Las compras reales representan el dinero que salió de caja para adquirir
+    // la materia prima que se vendió en el período. Este es el COGS correcto.
+    const comprasFilter: any = { status: 'Confirmada' };
+    if (dateFilter) comprasFilter.date = dateFilter;
+    const comprasDoc = await this.purchaseModel.find(comprasFilter).exec();
+    const totalCompras = comprasDoc.reduce((sum, c) => sum + c.total, 0);
 
-    // ── 3. EGRESOS: Gastos Variables (expenses del período) ──────────────────
+    // ── 3. KPI ANALÍTICO: Food Cost Teórico (basado en recetas) ─────────────
+    // Este número NO entra en el cálculo de utilidades; es un indicador de
+    // eficiencia de cocina que compara el costo teórico vs. el COGS real.
+    const foodCostTeorico = await this.calculateFoodCostForOrders(ordenes);
+    const foodCostPct = ingresos > 0 ? (foodCostTeorico / ingresos) * 100 : 0;
+
+    // ── 4. GASTOS OPERATIVOS ─────────────────────────────────────────────────
+
+    // 4a. Gastos Variables (expenses del período)
     const gastosVariablesDoc = await this.expenseModel.find(
       dateFilter ? { date: dateFilter } : {},
     ).exec();
-
     const totalVariables = gastosVariablesDoc.reduce((sum, g) => sum + g.amount, 0);
 
     const gastosPorCategoria: Record<string, number> = {};
@@ -52,36 +86,33 @@ export class ReportsService {
       gastosPorCategoria[g.category] = (gastosPorCategoria[g.category] ?? 0) + g.amount;
     });
 
-    // ── 4. EGRESOS: Gastos Fijos (catálogo permanente — siempre activos) ──────
+    // 4b. Gastos Fijos (catálogo permanente — PRORRATEADOS al período)
+    // Si el período es de N días, se aplica N/30 del valor mensual registrado.
     const gastosFijosDoc = await this.fixedExpenseModel.find({ isActive: true }).exec();
-    const totalFijos = gastosFijosDoc.reduce((sum, f) => sum + f.amount, 0);
+    const totalFijosMensual = gastosFijosDoc.reduce((sum, f) => sum + f.amount, 0);
+    const totalFijos = totalFijosMensual * factorProrrateo;
 
-    // Agregar fijos al desglose por categoría
+    // Agregar fijos al desglose por categoría (con prorrateo aplicado)
     gastosFijosDoc.forEach(f => {
-      gastosPorCategoria[f.category] = (gastosPorCategoria[f.category] ?? 0) + f.amount;
+      const montoProrrateado = f.amount * factorProrrateo;
+      gastosPorCategoria[f.category] = (gastosPorCategoria[f.category] ?? 0) + montoProrrateado;
     });
 
-    // ── 5. EGRESOS: Nómina (payroll records pagados del período) ─────────────
+    // 4c. Nómina — solo registros efectivamente PAGADOS, filtrados por la
+    // fecha real en que se realizó el pago (paidAt), no por el período laboral.
     const nominaFilter: any = { status: 'Pagado' };
-    if (dateFilter) nominaFilter.periodEnd = dateFilter;
+    if (dateFilter) nominaFilter.paidAt = dateFilter;
     const nominaDoc = await this.payrollModel.find(nominaFilter).exec();
     const totalNomina = nominaDoc.reduce((sum, n) => sum + n.netPay, 0);
 
-    // ── 6. EGRESOS: Compras a proveedores (órdenes confirmadas del período) ──
-    const comprasFilter: any = { status: 'Confirmada' };
-    if (dateFilter) comprasFilter.date = dateFilter;
-    const comprasDoc = await this.purchaseModel.find(comprasFilter).exec();
-    const totalCompras = comprasDoc.reduce((sum, c) => sum + c.total, 0);
-
-    // ── 7. TOTALES ──────────────────────────────────────────────────────────
-    const totalEgresos = totalVariables + totalFijos + totalNomina + totalCompras;
-
-    const utilidadBruta = ingresos - costoVenta;
-    const utilidadNeta  = ingresos - costoVenta - totalEgresos;
+    // ── 5. TOTALES (estructura de 4 niveles) ─────────────────────────────────
+    const utilidadBruta = ingresos - totalCompras;
+    const gastosOperativos = totalVariables + totalFijos + totalNomina;
+    const utilidadNeta = utilidadBruta - gastosOperativos;
 
     const margenBruto = ingresos > 0 ? (utilidadBruta / ingresos) * 100 : 0;
     const margenNeto  = ingresos > 0 ? (utilidadNeta  / ingresos) * 100 : 0;
-    const foodCostPct = ingresos > 0 ? (costoVenta    / ingresos) * 100 : 0;
+    const margenBruto_COGS = ingresos > 0 ? (totalCompras / ingresos) * 100 : 0;
 
     // Desglose por método de pago
     const ventasPorMetodo: Record<string, number> = {};
@@ -100,26 +131,37 @@ export class ReportsService {
     });
 
     return {
-      periodo: { from: from || 'Todo', to: to || 'Todo' },
-      // Ingresos
-      ingresos,
+      periodo: { from: from || 'Todo', to: to || 'Todo', diasPeriodo, factorProrrateo: Math.round(factorProrrateo * 100) },
+
+      // ── Nivel 1: Ingresos ────────────────────────────────────────────────
+      ingresos:           Math.round(ingresos           * 100) / 100,
       cantidadOrdenes,
-      ticketPromedio: Math.round(ticketPromedio * 100) / 100,
-      // Food cost teórico
-      costoVenta,
-      foodCostPct: Math.round(foodCostPct * 100) / 100,
-      // Egresos desglosados
-      gastosVariables: Math.round(totalVariables * 100) / 100,
-      gastosFijos:     Math.round(totalFijos    * 100) / 100,
-      nominaPeriodo:   Math.round(totalNomina   * 100) / 100,
-      comprasPeriodo:  Math.round(totalCompras  * 100) / 100,
-      totalEgresos:    Math.round(totalEgresos  * 100) / 100,
-      // Utilidades
-      utilidadBruta: Math.round(utilidadBruta * 100) / 100,
-      utilidadNeta:  Math.round(utilidadNeta  * 100) / 100,
-      margenBruto:   Math.round(margenBruto   * 100) / 100,
-      margenNeto:    Math.round(margenNeto    * 100) / 100,
-      // Desgloses
+      ticketPromedio:     Math.round(ticketPromedio      * 100) / 100,
+
+      // ── Nivel 2: COGS ────────────────────────────────────────────────────
+      costoVentas:        Math.round(totalCompras        * 100) / 100,  // COGS real
+      costoVentasPct:     Math.round(margenBruto_COGS    * 100) / 100,
+
+      // ── KPI Analítico (no entra en utilidad) ─────────────────────────────
+      foodCostTeorico:    Math.round(foodCostTeorico     * 100) / 100,
+      foodCostPct:        Math.round(foodCostPct         * 100) / 100,
+
+      // ── Nivel 3: Utilidad Bruta ──────────────────────────────────────────
+      utilidadBruta:      Math.round(utilidadBruta       * 100) / 100,
+      margenBruto:        Math.round(margenBruto         * 100) / 100,
+
+      // ── Gastos Operativos desglosados ────────────────────────────────────
+      gastosVariables:    Math.round(totalVariables      * 100) / 100,
+      gastosFijos:        Math.round(totalFijos          * 100) / 100,  // prorrateado
+      gastosFijosMensual: Math.round(totalFijosMensual   * 100) / 100,  // referencia
+      nominaPeriodo:      Math.round(totalNomina         * 100) / 100,
+      gastosOperativos:   Math.round(gastosOperativos    * 100) / 100,
+
+      // ── Nivel 4: Utilidad Neta ───────────────────────────────────────────
+      utilidadNeta:       Math.round(utilidadNeta        * 100) / 100,
+      margenNeto:         Math.round(margenNeto          * 100) / 100,
+
+      // ── Desgloses ────────────────────────────────────────────────────────
       ventasPorMetodo,
       ventasPorTipo,
       gastosPorCategoria,
@@ -127,16 +169,17 @@ export class ReportsService {
   }
 
   /**
-   * Punto de Equilibrio — usa costos fijos reales del catálogo + nómina
+   * Punto de Equilibrio — usa la misma arquitectura contable del PnL corregido
    */
   async getBreakEven(from?: string, to?: string) {
     const pnl = await this.getPnl(from, to);
 
-    // Costos de estructura = fijos permanentes + nómina del período
+    // Costos Fijos de estructura = Gastos Fijos (prorrateados) + Nómina
     const costosFijosEstructura = pnl.gastosFijos + pnl.nominaPeriodo;
 
-    // Costos variables = expenses variables + compras + food cost
-    const costosVariablesTotales = pnl.gastosVariables + pnl.comprasPeriodo + pnl.costoVenta;
+    // Costos Variables = Gastos Variables del período + COGS (compras)
+    // Las compras son el costo variable más importante del negocio (si no vendes, no compras)
+    const costosVariablesTotales = pnl.gastosVariables + pnl.costoVentas;
 
     const ratioVariable = pnl.ingresos > 0 ? costosVariablesTotales / pnl.ingresos : 0;
     const margenContribucion = 1 - ratioVariable;
@@ -173,12 +216,16 @@ export class ReportsService {
 
   /**
    * Tendencias de ventas — ventas agrupadas por día
+   * CORRECCIÓN: ahora incluye pedidos de Delivery pagados
    */
   async getTrends(from?: string, to?: string) {
     const dateFilter = this.buildDateFilter(from, to);
 
     const ordenes = await this.orderModel.find({
-      status: 'Pagado',
+      $or: [
+        { status: 'Pagado' },
+        { 'paymentInfo.status': 'Pagado' },
+      ],
       ...(dateFilter ? { createdAt: dateFilter } : {}),
     }).sort({ createdAt: 1 }).exec();
 
@@ -204,7 +251,9 @@ export class ReportsService {
   }
 
   /**
-   * Rentabilidad por producto — los más rentables, no los más vendidos
+   * Rentabilidad por producto — análisis de pricing basado en recetas actuales.
+   * NOTA: Este análisis es estático (no depende del período); muestra el margen
+   * teórico que debería tener cada producto según sus ingredientes actuales.
    */
   async getProfitability() {
     const products    = await this.productModel.find().exec();
@@ -246,6 +295,7 @@ export class ReportsService {
       productos:       profitability,
       foodCostGlobal:  Math.round(foodCostGlobal * 100) / 100,
       enRiesgo:        profitability.filter(p => p.foodCostPct > 35).length,
+      nota:            'Análisis basado en precios actuales de insumos. No refleja datos históricos.',
     };
   }
 
