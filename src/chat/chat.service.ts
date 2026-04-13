@@ -54,7 +54,7 @@ export class ChatService {
   }
 
   // ─── Get messages for a specific session ───────────────────────────────────
-  async getMessages(phone: string, limit = 100): Promise<ChatMessage[]> {
+  async getMessages(phone: string, limit = 300): Promise<ChatMessage[]> {
     return this.messageModel
       .find({ sessionPhone: phone })
       .sort({ createdAt: 1 })
