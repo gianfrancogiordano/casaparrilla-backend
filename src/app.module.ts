@@ -30,10 +30,13 @@ import { AgentModule } from './agent/agent.module';
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => {
-        const isProd = process.env.NODE_ENV === 'production';
+        // Lee dbName de una variable de entorno explícita.
+        // En producción (EC2): DB_NAME=casaparrilla
+        // En desarrollo local: DB_NAME=casaparrilla_test (o sin definir → default test)
+        const dbName = configService.get<string>('DB_NAME') ?? 'casaparrilla_test';
         return {
           uri: configService.get<string>('MONGODB_URI'),
-          dbName: isProd ? 'casaparrilla' : 'casaparrilla_test',
+          dbName,
         };
       },
       inject: [ConfigService],
