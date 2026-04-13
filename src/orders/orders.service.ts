@@ -231,6 +231,7 @@ export class OrdersService {
 
     if (itemsEnviados > 0) {
       order.status = 'En Cocina';
+      (order as any).kitchenSentAt = new Date();
     }
 
     const savedOrder = await order.save();
@@ -242,6 +243,10 @@ export class OrdersService {
 
     if (populatedOrder) {
       this.ordersGateway.emitOrderUpdated(populatedOrder);
+      // Notify the KDS in real-time
+      if (itemsEnviados > 0) {
+        this.ordersGateway.emitKitchenNewOrder(populatedOrder);
+      }
     }
     
     return populatedOrder || savedOrder;
@@ -328,6 +333,28 @@ export class OrdersService {
 
     // Emitir evento de actualización (socket)
     this.ordersGateway.emitOrderUpdated(existing);
+
+    // ── KDS events ───────────────────────────────────────────────────────────
+    // Delivery → En Cocina: notify kitchen display
+    if (newStatus === 'En Cocina' && (existing as any).orderType === 'Delivery') {
+      // Mark requiresKitchen items as sentToCocina and set timestamp
+      await this.orderModel.updateOne(
+        { _id: id },
+        {
+          $set: {
+            kitchenSentAt: new Date(),
+            'items.$[el].sentToCocina': true,
+          }
+        },
+        { arrayFilters: [{ 'el.requiresKitchen': true }] }
+      );
+      const freshOrder = await this.orderModel.findById(id).populate('clientId').populate('waiterId', 'name').exec();
+      this.ordersGateway.emitKitchenNewOrder(freshOrder);
+    }
+    // Any order → Listo: remove from KDS
+    if (newStatus === 'Listo') {
+      this.ordersGateway.emitKitchenOrderUpdated(existing);
+    }
 
     return existing;
   }

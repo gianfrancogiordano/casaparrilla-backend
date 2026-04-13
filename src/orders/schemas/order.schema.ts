@@ -99,6 +99,9 @@ export class Order {
   customerPhone?: string;
 
   @Prop()
+  kitchenSentAt?: Date;  // Timestamp when order was sent to kitchen (for KDS timer)
+
+  @Prop()
   fcmToken?: string;  // Token FCM del dispositivo del cliente (Tienda) — para push de status
 
   // ─── Satisfacción del cliente ─────────────────────────────────────────────

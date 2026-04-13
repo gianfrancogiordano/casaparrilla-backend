@@ -40,6 +40,15 @@ export class OrdersGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.emit('order_updated', order);
   }
 
+  // ─── Kitchen Display System (KDS) ──────────────────────────────────────────
+  emitKitchenNewOrder(order: any) {
+    this.server.emit('kitchen:new_order', order);
+  }
+
+  emitKitchenOrderUpdated(order: any) {
+    this.server.emit('kitchen:order_updated', order);
+  }
+
   @SubscribeMessage('ping')
   handlePing(client: Socket, data: any) {
     return { event: 'pong', data };
