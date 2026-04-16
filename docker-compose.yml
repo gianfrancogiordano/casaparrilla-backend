@@ -13,6 +13,7 @@ services:
       - FRONTEND_URL=${FRONTEND_URL}
       - FIREBASE_SERVICE_ACCOUNT_B64=${FIREBASE_SERVICE_ACCOUNT_B64}
       - DB_NAME=${DB_NAME:-casaparrilla}
+      - AGENT_URL=${AGENT_URL:-http://casaparrilla_agente:3008}
     logging:
       driver: "json-file"
       options:
