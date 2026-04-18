@@ -39,8 +39,8 @@ export class PublicController {
         return [];
       }
 
-      // Filtrar productos disponibles
-      return allProducts.filter((p) => p && p.available === true);
+      // Filtrar productos disponibles Y aptos para delivery (la tienda y Valentina son canales delivery)
+      return allProducts.filter((p) => p && p.available === true && (p as any).availableForDelivery !== false);
     } catch (error) {
       console.error('Error al obtener productos públicos:', error);
       // Retornar un arreglo vacío para evitar que la tienda se rompa por completo con un 500
