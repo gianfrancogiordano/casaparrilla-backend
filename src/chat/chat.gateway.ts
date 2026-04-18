@@ -27,6 +27,10 @@ export class ChatGateway {
     phone: string;
     role: 'user' | 'ai' | 'human';
     content: string;
+    type?: 'text' | 'audio' | 'image' | 'location';
+    mediaUrl?: string | null;
+    lat?: number | null;
+    lng?: number | null;
     timestamp: Date;
   }) {
     this.server.emit('chat:new_message', payload);
