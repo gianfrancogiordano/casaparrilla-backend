@@ -19,15 +19,15 @@ export class ChatMessage {
   type: 'text' | 'audio' | 'image' | 'location';
 
   /** Direct Meta CDN URL (~1h TTL) for audio/image messages */
-  @Prop({ default: null })
+  @Prop({ type: String, default: null })
   mediaUrl: string | null;
 
   /** Latitude for location messages */
-  @Prop({ default: null })
+  @Prop({ type: Number, default: null })
   lat: number | null;
 
   /** Longitude for location messages */
-  @Prop({ default: null })
+  @Prop({ type: Number, default: null })
   lng: number | null;
 
   /**
