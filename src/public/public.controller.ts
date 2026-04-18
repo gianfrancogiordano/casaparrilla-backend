@@ -112,11 +112,10 @@ export class PublicController {
 
     const savedOrder = await this.ordersService.create(newOrder);
 
-    // 🆕 Notificar al admin sobre el nuevo delivery
+    // 🆕 Notificar a todos los meseros/admins sobre el nuevo delivery
     const clientName = body.clientName || body.customerPhone || 'Cliente';
     const address = body.deliveryAddress || 'Dirección no especificada';
-    this.notificationsService.sendToTopic(
-      'admin-deliveries',
+    this.notificationsService.sendToAllStaff(
       '🛵 Nuevo Delivery',
       `${clientName} — ${address}`,
       { orderId: (savedOrder as any)._id?.toString() ?? '', orderType: 'Delivery' },
