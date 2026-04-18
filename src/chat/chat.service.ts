@@ -13,12 +13,16 @@ export class ChatService {
     private readonly chatGateway: ChatGateway,
   ) {}
 
-  // ─── Save an incoming or outgoing message ───────────────────────────────────
+  // ─── Save an incoming or outgoing message ─────────────────────────────────────────
   async saveMessage(
     phone: string,
     role: 'user' | 'ai' | 'human',
     content: string,
     clientName?: string,
+    type: 'text' | 'audio' | 'image' | 'location' = 'text',
+    mediaUrl?: string | null,
+    lat?: number | null,
+    lng?: number | null,
   ): Promise<ChatMessage> {
     // Upsert session
     const preview = content.length > 60 ? content.substring(0, 60) + '...' : content;
@@ -38,11 +42,25 @@ export class ChatService {
       { upsert: true, new: true },
     );
 
-    // Save message
-    const message = await this.messageModel.create({ sessionPhone: phone, role, content });
+    // Save message with media fields
+    const message = await this.messageModel.create({
+      sessionPhone: phone,
+      role,
+      content,
+      type,
+      mediaUrl: mediaUrl ?? null,
+      lat: lat ?? null,
+      lng: lng ?? null,
+    });
 
-    // Emit WebSocket events
-    this.chatGateway.emitNewMessage({ phone, role, content, timestamp: message['createdAt'] });
+    // Emit WebSocket events (include media fields for real-time inbox update)
+    this.chatGateway.emitNewMessage({
+      phone, role, content, type,
+      mediaUrl: mediaUrl ?? null,
+      lat: lat ?? null,
+      lng: lng ?? null,
+      timestamp: message['createdAt'],
+    });
     this.chatGateway.emitSessionUpdated(session);
 
     return message;

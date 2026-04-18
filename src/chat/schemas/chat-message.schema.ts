@@ -15,8 +15,20 @@ export class ChatMessage {
   @Prop({ required: true })
   content: string;
 
-  @Prop({ default: 'text', enum: ['text', 'audio', 'image'] })
-  type: 'text' | 'audio' | 'image';
+  @Prop({ default: 'text', enum: ['text', 'audio', 'image', 'location'] })
+  type: 'text' | 'audio' | 'image' | 'location';
+
+  /** Direct Meta CDN URL (~1h TTL) for audio/image messages */
+  @Prop({ default: null })
+  mediaUrl: string | null;
+
+  /** Latitude for location messages */
+  @Prop({ default: null })
+  lat: number | null;
+
+  /** Longitude for location messages */
+  @Prop({ default: null })
+  lng: number | null;
 
   /**
    * TTL index: MongoDB eliminará automáticamente los documentos

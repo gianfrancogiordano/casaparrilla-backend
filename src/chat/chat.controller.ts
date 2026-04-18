@@ -19,13 +19,25 @@ export class ChatController {
 
   /**
    * POST /chat/messages — called by the AI agent (Valentina) to sync messages.
-   * Body: { phone, role, content, clientName? }
+   * Body: { phone, role, content, clientName?, type?, mediaUrl?, lat?, lng? }
    */
   @Post('messages')
   saveMessage(
-    @Body() body: { phone: string; role: 'user' | 'ai' | 'human'; content: string; clientName?: string },
+    @Body() body: {
+      phone: string;
+      role: 'user' | 'ai' | 'human';
+      content: string;
+      clientName?: string;
+      type?: 'text' | 'audio' | 'image' | 'location';
+      mediaUrl?: string;
+      lat?: number;
+      lng?: number;
+    },
   ) {
-    return this.chatService.saveMessage(body.phone, body.role, body.content, body.clientName);
+    return this.chatService.saveMessage(
+      body.phone, body.role, body.content, body.clientName,
+      body.type ?? 'text', body.mediaUrl, body.lat, body.lng,
+    );
   }
 
   /**
