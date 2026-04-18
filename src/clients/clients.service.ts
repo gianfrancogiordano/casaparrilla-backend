@@ -39,8 +39,16 @@ export class ClientsService {
 
   async findOrCreateByPhone(phone: string, name: string): Promise<Client> {
     const existing = await this.findByPhone(phone);
-    if (existing) return existing;
-    return this.create({ name, phone, loyaltyPoints: 0, addresses: [] });
+    if (existing) {
+      // Si el nombre actual es genérico y ahora tenemos uno real, actualizarlo
+      const genericNames = ['cliente', 'unknown', ''];
+      if (name && !genericNames.includes(name.toLowerCase()) && genericNames.includes((existing.name || '').toLowerCase())) {
+        existing.name = name;
+        await (existing as any).save();
+      }
+      return existing;
+    }
+    return this.create({ name: name || 'Cliente', phone, loyaltyPoints: 0, addresses: [] });
   }
 
   async update(id: string, updateDto: any): Promise<Client> {
