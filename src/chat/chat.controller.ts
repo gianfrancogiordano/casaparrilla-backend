@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Patch, Param, Body, Query, Res } from '@nestjs/common';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { ChatService } from './chat.service';
 
 @Controller('chat')
