@@ -114,10 +114,17 @@ export class PublicController {
 
     // 🆕 Notificar a todos los meseros/admins sobre el nuevo delivery
     const clientName = body.clientName || body.customerPhone || 'Cliente';
-    const address = body.deliveryAddress || 'Dirección no especificada';
+    const totalOrder = savedOrder.totals?.total || 0;
+    const formattedTotal = new Intl.NumberFormat('en-US', { 
+      style: 'currency', 
+      currency: 'USD', 
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(totalOrder);
+    
     this.notificationsService.sendToAllStaff(
       '🛵 Nuevo Delivery',
-      `${clientName} — ${address}`,
+      `${clientName} — Monto: ${formattedTotal}`,
       { orderId: (savedOrder as any)._id?.toString() ?? '', orderType: 'Delivery' },
     );
 
