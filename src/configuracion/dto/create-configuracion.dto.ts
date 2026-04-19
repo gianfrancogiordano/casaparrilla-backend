@@ -84,4 +84,23 @@ export class CreateConfiguracionDto {
   @IsOptional()
   @IsString()
   pagoZelle?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  costoDelivery?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  costoDeliveryBs?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  costoDeliveryCop?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  agentEnabled?: boolean;
 }
