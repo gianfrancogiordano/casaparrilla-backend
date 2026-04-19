@@ -86,7 +86,17 @@ export class Configuracion {
 
   // ─── Delivery ────────────────────────────────────────────────────────────────
   @Prop({ type: Number, default: 0, min: 0 })
-  costoDelivery?: number;  // Costo de envío en USD (0 = gratis)
+  costoDelivery?: number;  // Costo de envío aprox. en USD
+
+  @Prop({ type: Number, default: 0, min: 0 })
+  costoDeliveryBs?: number;  // Costo de envío aprox. en Bolívares
+
+  @Prop({ type: Number, default: 0, min: 0 })
+  costoDeliveryCop?: number;  // Costo de envío aprox. en Pesos Colombianos
+
+  // ─── Agente IA ──────────────────────────────────────────────────────────────
+  @Prop({ default: true })
+  agentEnabled: boolean;   // Toggle global: false = Valentina no responde NINGÚN chat
 
   @Prop({ default: true })
   activo: boolean;

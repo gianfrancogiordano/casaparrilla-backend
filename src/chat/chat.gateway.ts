@@ -7,13 +7,20 @@ import { Server } from 'socket.io';
  */
 @WebSocketGateway({
   cors: {
-    origin: [
-      'https://admin.casaparrilla.com',
-      'https://www.casaparrilla.com',
-      'https://casaparrilla.com',
-      'http://localhost:4200',
-      'http://localhost:4201',
-    ],
+    origin: (origin: string, callback: Function) => {
+      if (!origin) return callback(null, true);
+      const allowed = [
+        'https://admin.casaparrilla.com',
+        'https://www.casaparrilla.com',
+        'https://casaparrilla.com',
+        'https://main.djc1g6bljnrfx.amplifyapp.com',
+      ];
+      if (allowed.includes(origin) || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: ['GET', 'POST'],
     credentials: true,
   },

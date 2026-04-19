@@ -39,4 +39,22 @@ export class ProductsService {
     }
     return deleted;
   }
+
+  /**
+   * Recalculate priceBs and priceCop for ALL products based on current exchange rates.
+   * COP is rounded up to the nearest 1000 (Colombian monetary convention).
+   */
+  async recalculatePrices(tasaBs: number, tasaCop: number): Promise<number> {
+    const products = await this.productModel.find().exec();
+    let updated = 0;
+
+    for (const p of products) {
+      const priceBs = Math.round(p.sellPrice * tasaBs * 100) / 100;
+      const priceCop = Math.ceil((p.sellPrice * tasaCop) / 1000) * 1000;
+      await this.productModel.findByIdAndUpdate(p._id, { priceBs, priceCop }).exec();
+      updated++;
+    }
+
+    return updated;
+  }
 }

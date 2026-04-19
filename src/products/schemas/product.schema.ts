@@ -32,6 +32,12 @@ export class Product {
   @Prop({ required: true })
   sellPrice: number;
 
+  @Prop({ type: Number, default: 0 })
+  priceBs: number;
+
+  @Prop({ type: Number, default: 0 })
+  priceCop: number;
+
   @Prop()
   category: string;
 
