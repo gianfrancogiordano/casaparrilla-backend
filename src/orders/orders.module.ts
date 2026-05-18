@@ -8,6 +8,7 @@ import { IngredientsModule } from '../ingredients/ingredients.module';
 import { ClientsModule } from '../clients/clients.module';
 import { Product, ProductSchema } from '../products/schemas/product.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { BanksModule } from '../banks/banks.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     IngredientsModule,
     ClientsModule,
     NotificationsModule,
+    BanksModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService, OrdersGateway], // Register the gateway

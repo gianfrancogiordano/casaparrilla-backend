@@ -9,6 +9,7 @@ import { Product, ProductDocument } from '../products/schemas/product.schema';
 
 import { OrdersGateway } from './orders.gateway';
 import { NotificationsService } from '../notifications/notifications.service';
+import { BanksService } from '../banks/banks.service';
 
 const AGENT_URL = process.env.AGENT_URL ?? 'http://localhost:3008';
 
@@ -22,6 +23,7 @@ export class OrdersService {
     private readonly clientsService: ClientsService,
     private readonly ordersGateway: OrdersGateway,
     private readonly notificationsService: NotificationsService,
+    private readonly banksService: BanksService,
   ) {}
 
   async create(createDto: any): Promise<Order> {
@@ -156,6 +158,18 @@ export class OrdersService {
     order.paymentInfo = { status: 'Pagado', method: paymentMethod };
 
     const savedOrder = await order.save();
+
+    // AUTO-REGISTRO en cuenta bancaria vinculada al método de pago
+    try {
+      await this.banksService.registerSaleMovement(
+        savedOrder._id.toString(),
+        (savedOrder as any).orderNumber,
+        paymentMethod,
+        savedOrder.totals.total,
+      );
+    } catch (err) {
+      console.warn('⚠️ No se registró movimiento bancario:', err.message);
+    }
 
     // DESCUENTO AUTOMÁTICO DE STOCK
     try {

@@ -66,6 +66,10 @@ export class PayrollRecord {
 
   @Prop()
   notes: string;
+
+  // Cuenta bancaria de la que se descuenta al pagar la nómina
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'BankAccount' })
+  bankAccountId?: mongoose.Types.ObjectId;
 }
 
 export const PayrollRecordSchema = SchemaFactory.createForClass(PayrollRecord);

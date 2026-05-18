@@ -21,6 +21,7 @@ import { FixedExpensesModule } from './fixed-expenses/fixed-expenses.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ChatModule } from './chat/chat.module';
 import { AgentModule } from './agent/agent.module';
+import { BanksModule } from './banks/banks.module';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { AgentModule } from './agent/agent.module';
     NotificationsModule,
     ChatModule,
     AgentModule,
+    BanksModule,
   ],
   controllers: [AppController],
   providers: [AppService],

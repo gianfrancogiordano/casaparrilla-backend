@@ -80,7 +80,7 @@ export class PayrollController {
   }
 
   @Post(':id/pay')
-  markAsPaid(@Param('id') id: string, @Body() body: { paymentMethod: string }) {
-    return this.payrollService.markAsPaid(id, body.paymentMethod);
+  markAsPaid(@Param('id') id: string, @Body() body: { paymentMethod: string; bankAccountId?: string }) {
+    return this.payrollService.markAsPaid(id, body.paymentMethod, body.bankAccountId);
   }
 }

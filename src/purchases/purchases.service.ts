@@ -4,6 +4,7 @@ import { Model } from 'mongoose';
 import { Supplier, SupplierDocument } from './schemas/supplier.schema';
 import { PurchaseOrder, PurchaseOrderDocument } from './schemas/purchase-order.schema';
 import { Ingredient, IngredientDocument } from '../ingredients/schemas/ingredient.schema';
+import { BanksService } from '../banks/banks.service';
 
 @Injectable()
 export class PurchasesService {
@@ -11,6 +12,7 @@ export class PurchasesService {
     @InjectModel(Supplier.name) private readonly supplierModel: Model<SupplierDocument>,
     @InjectModel(PurchaseOrder.name) private readonly purchaseModel: Model<PurchaseOrderDocument>,
     @InjectModel(Ingredient.name) private readonly ingredientModel: Model<IngredientDocument>,
+    private readonly banksService: BanksService,
   ) {}
 
   // ─── Proveedores ────────────────────────────────────────────────────
@@ -115,7 +117,25 @@ export class PurchasesService {
     }
 
     purchase.status = 'Confirmada';
-    return purchase.save();
+    const saved = await purchase.save();
+
+    // Auto-registrar egreso en cuenta bancaria vinculada
+    if (saved.bankAccountId) {
+      try {
+        const supplier = await this.supplierModel.findById(saved.supplierId).exec();
+        const supplierName = supplier?.name || 'Proveedor';
+        await this.banksService.registerEgressMovement(
+          saved.bankAccountId.toString(),
+          `Compra: ${supplierName} ($${saved.total.toFixed(2)})`,
+          saved.total,
+          'Pago Proveedor',
+        );
+      } catch (err) {
+        console.warn('⚠️ No se registró egreso bancario para compra:', err.message);
+      }
+    }
+
+    return saved;
   }
 
   /**

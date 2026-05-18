@@ -51,6 +51,10 @@ export class PurchaseOrder {
 
   @Prop()
   notes: string;
+
+  // Cuenta bancaria de la que se descuenta al confirmar la compra
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'BankAccount' })
+  bankAccountId?: mongoose.Types.ObjectId;
 }
 
 export const PurchaseOrderSchema = SchemaFactory.createForClass(PurchaseOrder);

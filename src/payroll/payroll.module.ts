@@ -4,6 +4,7 @@ import { PayrollController } from './payroll.controller';
 import { PayrollService } from './payroll.service';
 import { Employee, EmployeeSchema } from './schemas/employee.schema';
 import { PayrollRecord, PayrollRecordSchema } from './schemas/payroll-record.schema';
+import { BanksModule } from '../banks/banks.module';
 
 @Module({
   imports: [
@@ -11,6 +12,7 @@ import { PayrollRecord, PayrollRecordSchema } from './schemas/payroll-record.sch
       { name: Employee.name, schema: EmployeeSchema },
       { name: PayrollRecord.name, schema: PayrollRecordSchema },
     ]),
+    BanksModule,
   ],
   controllers: [PayrollController],
   providers: [PayrollService],

@@ -5,6 +5,7 @@ import { PurchasesService } from './purchases.service';
 import { Supplier, SupplierSchema } from './schemas/supplier.schema';
 import { PurchaseOrder, PurchaseOrderSchema } from './schemas/purchase-order.schema';
 import { Ingredient, IngredientSchema } from '../ingredients/schemas/ingredient.schema';
+import { BanksModule } from '../banks/banks.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { Ingredient, IngredientSchema } from '../ingredients/schemas/ingredient.
       { name: PurchaseOrder.name, schema: PurchaseOrderSchema },
       { name: Ingredient.name, schema: IngredientSchema },
     ]),
+    BanksModule,
   ],
   controllers: [PurchasesController],
   providers: [PurchasesService],

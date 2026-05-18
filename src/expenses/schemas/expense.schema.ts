@@ -29,6 +29,10 @@ export class Expense {
 
   @Prop()
   notes?: string;
+
+  // Cuenta bancaria de la que se descuenta este gasto
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'BankAccount' })
+  bankAccountId?: mongoose.Types.ObjectId;
 }
 
 export const ExpenseSchema = SchemaFactory.createForClass(Expense);

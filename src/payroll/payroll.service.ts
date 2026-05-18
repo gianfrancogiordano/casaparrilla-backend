@@ -3,12 +3,14 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Employee, EmployeeDocument } from './schemas/employee.schema';
 import { PayrollRecord, PayrollRecordDocument } from './schemas/payroll-record.schema';
+import { BanksService } from '../banks/banks.service';
 
 @Injectable()
 export class PayrollService {
   constructor(
     @InjectModel(Employee.name) private readonly employeeModel: Model<EmployeeDocument>,
     @InjectModel(PayrollRecord.name) private readonly payrollModel: Model<PayrollRecordDocument>,
+    private readonly banksService: BanksService,
   ) {}
 
   // ─── Empleados ──────────────────────────────────────────────────────
@@ -105,7 +107,7 @@ export class PayrollService {
   /**
    * Marcar nómina como pagada
    */
-  async markAsPaid(id: string, paymentMethod: string): Promise<PayrollRecord> {
+  async markAsPaid(id: string, paymentMethod: string, bankAccountId?: string): Promise<PayrollRecord> {
     const record = await this.payrollModel.findById(id).exec();
     if (!record) throw new NotFoundException(`Registro #${id} no encontrado`);
     if (record.status === 'Pagado') throw new BadRequestException('Esta nómina ya fue pagada');
@@ -113,7 +115,27 @@ export class PayrollService {
     record.status = 'Pagado';
     record.paidAt = new Date();
     record.paymentMethod = paymentMethod;
-    return record.save();
+    if (bankAccountId) (record as any).bankAccountId = bankAccountId;
+    const saved = await record.save();
+
+    // Auto-registrar egreso en cuenta bancaria vinculada
+    const linkedBank = bankAccountId || (saved as any).bankAccountId?.toString();
+    if (linkedBank) {
+      try {
+        const employee = await this.employeeModel.findById(saved.employeeId).exec();
+        const empName = employee?.name || 'Empleado';
+        await this.banksService.registerEgressMovement(
+          linkedBank,
+          `Nómina: ${empName} ($${saved.netPay.toFixed(2)})`,
+          saved.netPay,
+          'Nómina',
+        );
+      } catch (err) {
+        console.warn('⚠️ No se registró egreso bancario para nómina:', err.message);
+      }
+    }
+
+    return saved;
   }
 
   /**

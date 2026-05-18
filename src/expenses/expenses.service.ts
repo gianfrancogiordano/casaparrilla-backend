@@ -2,14 +2,34 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Expense, ExpenseDocument } from './schemas/expense.schema';
+import { BanksService } from '../banks/banks.service';
 
 @Injectable()
 export class ExpensesService {
-  constructor(@InjectModel(Expense.name) private readonly expenseModel: Model<ExpenseDocument>) {}
+  constructor(
+    @InjectModel(Expense.name) private readonly expenseModel: Model<ExpenseDocument>,
+    private readonly banksService: BanksService,
+  ) {}
 
   async create(createDto: any): Promise<Expense> {
     const created = new this.expenseModel(createDto);
-    return created.save();
+    const saved = await created.save();
+
+    // Auto-registrar egreso en cuenta bancaria vinculada
+    if (saved.bankAccountId) {
+      try {
+        await this.banksService.registerEgressMovement(
+          saved.bankAccountId.toString(),
+          `Gasto: ${saved.description}`,
+          saved.amount,
+          'Gasto',
+        );
+      } catch (err) {
+        console.warn('⚠️ No se registró egreso bancario para gasto:', err.message);
+      }
+    }
+
+    return saved;
   }
 
   async findAll(): Promise<Expense[]> {
